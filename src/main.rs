@@ -1,5 +1,7 @@
 use std::fs::File;
+use std::io;
 use std::io::Read;
+use std::io::Write;
 use std::path::Path;
 
 enum Value {
@@ -22,19 +24,17 @@ fn main() {
 		.read_to_end(&mut data)
 		.expect(&format!("Couldn't read file {}", file));
 
-	//*
 	let mut memory: Vec<u16> = Vec::new();
 
 	for i in (0..data.len()).step_by(2) {
 		// stored as little endian: low high
 		memory.push((data[i + 1] as u16) << 8 | (data[i] as u16));
 	}
-	// */
-	// let memory = vec![9, 32768, 32758, 15 + '0' as u16, 19, 32768, 0];
 
 	let mut registers: [u16; 8] = [0, 0, 0, 0, 0, 0, 0, 0];
 	let mut stack: Vec<u16> = Vec::new();
 	let mut pc = 0;
+	let mut input: Vec<u16> = Vec::new();
 
 	fn parse(word: u16) -> Value {
 		return if word <= 32767 {
@@ -259,7 +259,29 @@ fn main() {
 
 			// in a
 			20 => {
-				panic!("op 20 not implemented");
+				if input.len() == 0 {
+					print!("> ");
+					io::stdout().flush().expect("Error on stdout");
+
+					let mut buf = String::new();
+					io::stdin()
+						.read_line(&mut buf)
+						.expect("Failed to read input line");
+
+					for c in buf.chars() {
+						input.push(c as u16);
+					}
+				}
+
+				if input.len() == 0 {
+					// got ctrl+d, exit
+					println!("");
+					break;
+				}
+
+				set(pc + 1, input.remove(0), &mut registers, &mut memory);
+
+				pc += 2;
 			}
 
 			// noop
