@@ -12,6 +12,15 @@
 				"kind": "build",
 				"isDefault": true
 			}
+		},
+		{
+			"label": "Cargo clippy",
+			"type": "shell",
+			"command": "cargo",
+			"args": [
+				"clippy"
+			],
+			"problemMatcher": []
 		}
 	]
 }

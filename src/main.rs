@@ -10,21 +10,21 @@ enum Value {
 }
 
 fn parse(word: u16) -> Value {
-	return if word <= 32767 {
+	if word <= 32767 {
 		Value::Literal(word)
 	} else if word <= 32775 {
 		Value::Register(word - 32768)
 	} else {
-		panic!(format!("Value {} is invalid", word));
-	};
+		panic!("Value {} is invalid", word);
+	}
 }
 
 fn load(file: &str) -> Vec<u16> {
 	let mut data = Vec::new();
 	File::open(Path::new(file))
-		.expect(&format!("Couldn't open file {}", file))
+		.unwrap_or_else(|_| panic!("Couldn't open file {}", file))
 		.read_to_end(&mut data)
-		.expect(&format!("Couldn't read file {}", file));
+		.unwrap_or_else(|_| panic!("Couldn't read file {}", file));
 
 	let mut memory: Vec<u16> = Vec::new();
 
@@ -33,7 +33,7 @@ fn load(file: &str) -> Vec<u16> {
 		memory.push((data[i + 1] as u16) << 8 | (data[i] as u16));
 	}
 
-	return memory;
+	memory
 }
 
 fn run(file: &str) {
@@ -43,11 +43,11 @@ fn run(file: &str) {
 	let mut pc = 0;
 	let mut input: Vec<u16> = Vec::new();
 
-	fn get(address: usize, registers: &[u16; 8], memory: &Vec<u16>) -> u16 {
-		return match parse(memory[address]) {
+	fn get(address: usize, registers: &[u16; 8], memory: &[u16]) -> u16 {
+		match parse(memory[address]) {
 			Value::Literal(v) => v,
 			Value::Register(r) => registers[r as usize],
-		};
+		}
 	}
 
 	fn set(address: usize, value: u16, registers: &mut [u16; 8], memory: &mut Vec<u16>) {
@@ -255,7 +255,7 @@ fn run(file: &str) {
 
 			// in a
 			20 => {
-				if input.len() == 0 {
+				if input.is_empty() {
 					print!("> ");
 					io::stdout().flush().expect("Error on stdout");
 
@@ -269,9 +269,9 @@ fn run(file: &str) {
 					}
 				}
 
-				if input.len() == 0 {
+				if input.is_empty() {
 					// got ctrl+d, exit
-					println!("");
+					println!();
 					break;
 				}
 
@@ -283,7 +283,7 @@ fn run(file: &str) {
 			// noop
 			21 => pc += 1,
 
-			v => panic!(format!("unknown opcode {}", v)),
+			v => panic!("unknown opcode {}", v),
 		};
 	}
 }
@@ -346,7 +346,7 @@ fn dis(file: &str) {
 				}
 			}
 
-			println!("");
+			println!();
 		}
 
 		prev_code = code;
