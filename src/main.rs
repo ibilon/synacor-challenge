@@ -9,15 +9,17 @@ enum Value {
 	Register(u16),
 }
 
-fn main() {
-	let args: Vec<String> = std::env::args().collect();
-
-	let file = if args.len() > 1 {
-		&args[1]
+fn parse(word: u16) -> Value {
+	return if word <= 32767 {
+		Value::Literal(word)
+	} else if word <= 32775 {
+		Value::Register(word - 32768)
 	} else {
-		"challenge.bin"
+		panic!(format!("Value {} is invalid", word));
 	};
+}
 
+fn load(file: &str) -> Vec<u16> {
 	let mut data = Vec::new();
 	File::open(Path::new(file))
 		.expect(&format!("Couldn't open file {}", file))
@@ -31,20 +33,15 @@ fn main() {
 		memory.push((data[i + 1] as u16) << 8 | (data[i] as u16));
 	}
 
+	return memory;
+}
+
+fn run(file: &str) {
+	let mut memory = load(file);
 	let mut registers: [u16; 8] = [0, 0, 0, 0, 0, 0, 0, 0];
 	let mut stack: Vec<u16> = Vec::new();
 	let mut pc = 0;
 	let mut input: Vec<u16> = Vec::new();
-
-	fn parse(word: u16) -> Value {
-		return if word <= 32767 {
-			Value::Literal(word)
-		} else if word <= 32775 {
-			Value::Register(word - 32768)
-		} else {
-			panic!(format!("Value {} is invalid", word));
-		};
-	}
 
 	fn get(address: usize, registers: &[u16; 8], memory: &Vec<u16>) -> u16 {
 		return match parse(memory[address]) {
@@ -55,7 +52,6 @@ fn main() {
 
 	fn set(address: usize, value: u16, registers: &mut [u16; 8], memory: &mut Vec<u16>) {
 		match parse(memory[address]) {
-			// Value::Literal(v) => panic!(format!("set address is literal {}", v)),
 			Value::Literal(v) => memory[v as usize] = value,
 			Value::Register(r) => registers[r as usize] = value,
 		}
@@ -289,5 +285,94 @@ fn main() {
 
 			v => panic!(format!("unknown opcode {}", v)),
 		};
+	}
+}
+
+fn dis(file: &str) {
+	let memory = load(file);
+	let mut prev_code = 0;
+	let mut pc = 0;
+
+	let names = [
+		"halt", "set", "push", "pop", "eq", "gt", "jmp", "jt", "jf", "add", "mult", "mod", "and",
+		"or", "not", "rmem", "wmem", "call", "ret", "out", "in", "noop",
+	];
+
+	let sizes = [
+		1, 3, 2, 2, 4, 4, 2, 3, 3, 4, 4, 4, 4, 4, 3, 3, 3, 2, 1, 2, 2, 1,
+	];
+
+	while pc < memory.len() {
+		let code = memory[pc] as usize;
+
+		if code > 21 {
+			println!("{}: data {}", pc, code);
+			pc += 1;
+			continue;
+		}
+
+		let size = sizes[code];
+
+		if code == 19 {
+			// out
+			if prev_code != 19 {
+				print!("{}: out \"", pc);
+			}
+
+			let c = memory[pc + 1] as u8;
+
+			if c == 10 {
+				print!("\\n");
+			} else if c == 34 {
+				print!("\\\"");
+			} else if c == 92 {
+				print!("\\\\");
+			} else if c < 32 || c > 126 {
+				print!("\\{}", c);
+			} else {
+				print!("{}", c as char);
+			}
+
+			if memory[pc + 2] != 19 {
+				println!("\"");
+			}
+		} else {
+			print!("{}: {}", pc, names[code]);
+
+			for i in 1..size {
+				match parse(memory[pc + i]) {
+					Value::Literal(v) => print!(" {}", v),
+					Value::Register(r) => print!(" r{}", r),
+				}
+			}
+
+			println!("");
+		}
+
+		prev_code = code;
+		pc += size;
+	}
+}
+
+fn main() {
+	let args: Vec<String> = std::env::args().collect();
+
+	if args.len() == 1 {
+		println!(
+			"Synacor challenge\n================\n{} run|dis [file]",
+			args[0]
+		);
+	} else {
+		let file = if args.len() > 2 {
+			args[2].as_ref()
+		} else {
+			"challenge.bin"
+		};
+
+		match args[1].as_ref() {
+			"run" => run(file),
+			"dis" => dis(file),
+			other => eprintln!("Unknown mode {}, use run or dis", other),
+		}
 	}
 }
